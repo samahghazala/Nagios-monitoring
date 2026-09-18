@@ -1,0 +1,166 @@
+Agent)** on the 5 target machines to securely pull their metrics (like CPU, RAM, and Disk).
+## Part 1: Install Nagios Core on the Central Server
+Run these commands on the machine designated as your **Nagios Core Server**.
+### 1. Install Prerequisites & Build Dependencies
+```bash
+sudo apt update
+sudo apt install -y wget build-essential apache2 php libapache2-mod-php php-gd libgd-dev unzip libssl-dev
+
+```
+### 2. Create User and Group
+```bash
+sudo useradd nagios
+sudo groupadd nagcmd
+sudo usermod -a -G nagcmd nagios
+sudo usermod -a -G nagcmd www-data
+
+```
+### 3. Compile & Install Nagios Core
+```bash
+cd /tmp
+wget https://assets.nagios.com/downloads/nagioscore/releases/nagios-4.5.1.tar.gz
+tar -xzf nagios-4.5.1.tar.gz
+cd nagios-4.5.1
+
+./configure --with-nagios-group=nagios --with-command-group=nagcmd
+make all
+sudo make install
+sudo make install-commandmode
+sudo make install-init
+sudo make install-config
+sudo make install-webconf
+
+```
+### 4. Create the Web Interface Admin User
+Set a secure password for the nagiosadmin account, which you will use to log into the dashboard:
+```bash
+sudo htpasswd -c /usr/local/nagios/etc/htpasswd.users nagiosadmin
+sudo a2enmod rewrite cgi
+sudo systemctl restart apache2
+
+```
+### 5. Install Official Nagios Plugins
+Without plugins, Nagios is just an empty dashboard. Let's install the standard metrics package:
+```bash
+cd /tmp
+wget https://nagios-plugins.org/download/nagios-plugins-2.4.8.tar.gz
+tar -xzf nagios-plugins-2.4.8.tar.gz
+cd nagios-plugins-2.4.8
+
+./configure --with-nagios-user=nagios --with-nagios-group=nagios
+make
+sudo make install
+
+```
+Start Nagios and make sure it boots up automatically:
+```bash
+sudo systemctl enable --now nagios
+
+```
+Code snippet
+cfg_dir=/usr/local/nagios/etc/servers
+(Make sure to create that directory: mkdir -p /usr/local/nagios/etc/servers)
+
+Step 2: Define the Commands (commands.cfg)
+Ensure your ncpa command is defined so Nagios knows how to talk to the remote agents. In /usr/local/nagios/etc/objects/commands.cfg
+define command {
+    command_name    check_ncpa
+    command_line    $USER1$/check_ncpa.py -H $HOSTADDRESS$ -t '$ARG1$' -M '$ARG2$' $ARG3$
+}
+
+## Part 3: Configure Nagios Server to Monitor the 5 Machines
+Now we tell the Nagios Core Server how to connect to those 5 clients using the token we just created.
+### 1. Tell Nagios to Look for Remote Config Files
+Open the main Nagios config on the server:
+```bash
+sudo nano /usr/local/nagios/etc/nagios.cfg
+
+```
+Scroll down and look for the configuration directory section. **Uncomment** (or add) this line so Nagios automatically reads any configuration file we place inside a dedicated directory:
+```text
+cfg_dir=/usr/local/nagios/etc/servers
+
+```
+Save the file, then create that target directory:
+```bash
+sudo mkdir -p /usr/local/nagios/etc/servers
+
+```
+### 2. Define the check_ncpa Plugin Command
+Open the default command definition file to teach Nagios how to talk to NCPA:
+```bash
+sudo nano /usr/local/nagios/etc/objects/commands.cfg
+
+```
+Add this snippet at the bottom of the file (replace your_secret_token with the actual token you set on your clients):
+```text
+
+
+define command {
+command_name check_ncpa
+command_line $USER1$/check_ncpa.py -H $HOSTADDRESS$ -t 'your_secret_token' -M $ARG1$
+}
+
+```
+####################to avoid swap error in localhost######################3
+define command {
+
+    command_name    check_local_swap
+    command_line    $USER1$/check_swap -n ok -w $ARG1$ -c $ARG2$
+}
+
+make sure to add +x to /usr/local/nagios/libexec/check_ncpa.py file and chown to nagios:nagios 
+
+root@nagios01:~# ls -l /usr/local/nagios/libexec/check_ncpa.py
+-rwxr-xr-x 1 nagios nagios 12197 May 29 20:57 /usr/local/nagios/libexec/check_ncpa.py
+root@nagios01:~#
+
+### 3. Create the 5 Server Config Files
+Instead of writing 5 completely unique files by hand, we will leverage Nagios's custom templates to build them cleanly. Create a separate file for your machines inside the new directory:
+```bash
+sudo nano /usr/local/nagios/etc/servers/clients.cfg
+
+**********************************************************************************************************************************************
+**********************************************************************************************************************************************
+
+
+
+Step 1: Install NCPA Agent
+Depending on your OS distribution, run the following on your target machines:
+
+For Ubuntu / Debian:
+
+Bash
+curl -sSL https://repo.nagios.com/nagios-repo-repository.v1.deb -o nagios-repo.deb
+sudo dpkg -i nagios-repo.deb
+sudo apt-get update
+sudo apt-get install ncpa -y
+For RHEL / Rocky Linux:
+
+Bash
+sudo rpm -Uvh https://repo.nagios.com/nagios/9/nagios-repo-9-2.el9.noarch.rpm
+
+sudo dnf install ncpa -y
+
+
+Step 2: Edit ncpa.cfg on Clients
+Open the configurations file on each node located at /usr/local/ncpa/etc/ncpa.cfg.
+Look for the community_string configuration option and set it to match the token you defined in your Nagios server config file:
+community_string = mytoken123
+Allow the Nagios Server to connect
+Find the allowed_hosts directive and add your Nagios server's IP address:
+allowed_hosts=127.0.0.1,::1,<NAGIOS_SERVER_IP>
+
+Step 3: Restart NCPA Agent
+Apply the token update by restarting the service:
+Bash
+sudo systemctl restart ncpa
+
+
+# Verify config
+sudo /usr/local/nagios/bin/nagios -v /usr/local/nagios/etc/nagios.cfg
+If it reports "Things look okay - No serious problems were detected during the pre-flight check", you can safely reload Nagios:
+
+Bash
+sudo systemctl restart nagios
+Now, when you log into your Nagios Web Dashboard, you should see all 5 hosts active, tracking global infrastructure metrics alongside their respective application, database, and caching ports!

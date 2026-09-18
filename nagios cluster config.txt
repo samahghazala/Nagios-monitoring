@@ -1,0 +1,118 @@
+# HOST DEFINITIONS
+###############################################################################
+
+define host {
+    use                     linux-server
+    host_name               web01
+    alias                   Nginx Load Balancer
+    address                 192.168.56.11
+}
+
+define host {
+    use                     linux-server
+    host_name               app01
+    alias                   Tomcat Application Server
+    address                 192.168.56.12
+}
+
+define host {
+    use                     linux-server
+    host_name               db01
+    alias                   MariaDB Database Server
+    address                 192.168.56.15
+}
+
+define host {
+    use                     linux-server
+    host_name               rmq01
+    alias                   RabbitMQ Message Broker
+    address                 192.168.56.13
+}
+
+define host {
+    use                     linux-server
+    host_name               mc01
+    alias                   Memcached Server
+    address                 192.168.56.14
+}
+
+###############################################################################
+# GLOBAL SERVICE DEFINITIONS (Applies to all 5 machines via host_name)
+###############################################################################
+
+# Ping Check
+define service {
+    use                     generic-service
+    host_name               web01,app01,db01,rmq01,mc01
+    service_description     PING
+    check_command           check_ping!100.0,20%!500.0,60%
+}
+
+# SSH Check
+define service {
+    use                     generic-service
+    host_name               web01,app01,db01,rmq01,mc01
+    service_description     SSH Port
+    check_command           check_ssh
+}
+
+# Remote Disk Check via NRPE
+define service {
+    use                     generic-service
+    host_name               web01,app01,db01,rmq01,mc01
+    service_description     Disk Usage
+    check_command           check_ncpa!-t 'mytoken123' -P 5693 -M 'disk/logical/|' -w 80 -c 90
+}
+
+# Remote CPU Load via NRPE
+define service {
+    use                     generic-service
+    host_name               web01,app01,db01,rmq01,mc01
+    service_description     CPU Load
+    check_command           check_ncpa!cpu/percent!-w 85 -c 95
+}
+
+###############################################################################
+# SERVICE-SPECIFIC DEFINITIONS
+###############################################################################
+
+# 1. Nginx specific: HTTP Check
+define service {
+    use                     generic-service
+    host_name               web01
+    service_description     HTTP Web Service
+    check_command           check_http!-p 80
+}
+
+# 2. Tomcat specific: Check if port 8080 is responding
+define service {
+    use                     generic-service
+    host_name               app01
+    service_description     Tomcat Port 8080
+    check_command           check_tcp!8080
+}
+
+# 3. MariaDB specific: Check MySQL port 3306 response
+define service {
+    use                     generic-service
+    host_name               db01
+    service_description     MariaDB Port 3306
+    check_command           check_tcp!3306
+}
+
+# 4. RabbitMQ specific: Check management/AMQP ports
+define service {
+    use                     generic-service
+    host_name               rmq01
+    service_description     RabbitMQ AMQP Port
+    check_command           check_tcp!5672
+}
+
+# 5. Memcached specific: Check Memcached port 11211
+define service {
+    use                     generic-service
+    host_name               mc01
+    service_description     Memcached Port 11211
+    check_command           check_tcp!11211
+}
+
