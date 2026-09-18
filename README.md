@@ -1,3 +1,4 @@
+<img width="947" height="403" alt="Screenshot 2026-05-30 134040" src="https://github.com/user-attachments/assets/c4e9abfb-22f5-469b-b3e3-58e449d2a52d" />
 # Infrastructure Monitoring Setup with Nagios Core & NCPA
 
 ## Project Description
@@ -94,3 +95,5 @@ http://<NAGIOS_SERVER_IP>/nagios
 Default User: nagiosadmin
 
 Password: Configured during installation script setup.
+<img width="952" height="528" alt="Screenshot 2026-05-30 134010" src="https://github.com/user-attachments/assets/d6a08663-4061-40ef-be5e-800bf480805b" />
+<img width="947" height="403" alt="Screenshot 2026-05-30 134040" src="https://github.com/user-attachments/assets/5f086f76-6314-4182-af30-2f19ab365e17" />
